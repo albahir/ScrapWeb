@@ -12,6 +12,10 @@
 #include <QProgressBar>
 #include <QLabel>
 #include <QGroupBox>
+#include "GrafoWeb.h"
+#include "RastreadorWeb.h"
+#include <QStandardItemModel>
+
 
 class VentanaPrincipal : public QMainWindow {
     Q_OBJECT
@@ -25,9 +29,15 @@ private slots:
     void iniciarMapeo();
     void detenerMapeo();
     void buscarPalabra();
+    void onEnlaceDescubierto(const QString& url);
+    void onRastreoFinalizado();
+    void poblarArbolVisual();
 
 private:
     // --- Elementos del Panel Izquierdo (Controles) ---
+    GrafoWeb *grafo;
+    RastreadorWeb *rastreador;
+    QStandardItemModel *modeloArbol;
     QLineEdit *txtUrl;
     QSpinBox *spinProfundidad;
     QPushButton *btnIniciar;

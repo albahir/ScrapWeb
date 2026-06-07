@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.19)
 project(ProyectoScrapWeb LANGUAGES CXX)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets LinguistTools)
+
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets LinguistTools Network)
+
 
 qt_standard_project_setup()
 
@@ -23,7 +25,12 @@ set(CAPA_PRESENTACION
 )
 
 set(CAPA_NEGOCIO
-    # Aquí irán: CapaNegocio/AnalizadorWeb.cpp, etc.
+
+    CapaNegocio/GrafoWeb.cpp
+    CapaNegocio/GrafoWeb.h
+    CapaNegocio/RastreadorWeb.cpp
+    CapaNegocio/RastreadorWeb.h
+
 )
 
 set(CAPA_DATOS
@@ -40,6 +47,12 @@ qt_add_executable(ProyectoScrapWeb
     ${CAPA_PRESENTACION}
     ${CAPA_NEGOCIO}
     ${CAPA_DATOS}
+
+    CapaNegocio/GrafoWeb.h
+    CapaNegocio/GrafoWeb.cpp
+    CapaNegocio/RastreadorWeb.h
+    CapaNegocio/RastreadorWeb.cpp
+
 )
 
 # ========================================================================
@@ -60,8 +73,12 @@ qt_add_translations(
 
 target_link_libraries(ProyectoScrapWeb
     PRIVATE
-        Qt::Core
-        Qt::Widgets
+
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Widgets
+        Qt6::Network
+
 )
 
 include(GNUInstallDirs)
