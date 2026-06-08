@@ -23,10 +23,11 @@ public:
     void limpiar();
     int cantidadNodos() const;
     int cantidadAristas() const;
-
-    // Exponer el grafo completo por si la capa de datos necesita guardarlo en un archivo
+     // Exponer el grafo completo por si la capa de datos necesita guardarlo en un archivo
     const QHash<QString, QStringList>& obtenerEstructuraCompleta() const;
-
+    void calcularRutasDesdeRaiz(const QString& urlOrigen,
+                                QHash<QString, int>& distancias,
+                                QHash<QString, QString>& padres) const;
 private:
     // La Lista de Adyacencia:
     // La llave (Key) es la URL de origen.

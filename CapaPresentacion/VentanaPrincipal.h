@@ -14,6 +14,7 @@
 #include <QGroupBox>
 #include "GrafoWeb.h"
 #include "RastreadorWeb.h"
+#include "IndiceInvertido.h"
 #include <QStandardItemModel>
 
 
@@ -25,27 +26,37 @@ public:
     ~VentanaPrincipal();
 
 private slots:
-    // Aquí conectaremos la interfaz con la Capa de Negocio
+
     void iniciarMapeo();
     void detenerMapeo();
     void buscarPalabra();
     void onEnlaceDescubierto(const QString& url);
     void onRastreoFinalizado();
-    void poblarArbolVisual();
+    void onPaginaDescargada(const QString& url, const QString& html);
+    void guardarHistorial();
+    void cargarHistorial();
 
 private:
     // --- Elementos del Panel Izquierdo (Controles) ---
     GrafoWeb *grafo;
     RastreadorWeb *rastreador;
+    IndiceInvertido *miIndiceInvertido;
     QStandardItemModel *modeloArbol;
     QLineEdit *txtUrl;
     QSpinBox *spinProfundidad;
+    QSpinBox *spinConcurrencia;
     QPushButton *btnIniciar;
     QPushButton *btnDetener;
+    QPushButton *btnGuardar;
+    QPushButton *btnCargar;
     QListWidget *listaFiltros;
     QProgressBar *barraProgreso;
     QLabel *lblEstado;
 
+    void configurarInterfaz();
+    QVBoxLayout* crearPanelIzquierdo();
+    QVBoxLayout* crearPanelCentral();
+    QVBoxLayout* crearPanelDerecho();
     // --- Elementos del Panel Central (Estructura y Búsqueda) ---
     QTreeView *arbolEstructura;
     QLineEdit *txtBuscar;
@@ -57,9 +68,9 @@ private:
     QLabel *lblProfundidadMax;
     QLabel *lblMasEnlaces;
     QLabel *lblTamanoTotal;
+    QLabel *lblTiempoEjecucion;
 
-    // Función auxiliar para armar la interfaz
-    void configurarInterfaz();
+
 };
 
 #endif // VENTANAPRINCIPAL_H

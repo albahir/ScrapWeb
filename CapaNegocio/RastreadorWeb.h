@@ -9,6 +9,7 @@
 #include <QSet>
 #include <QQueue>
 #include "GrafoWeb.h"
+#include <QElapsedTimer>
 
 class RastreadorWeb : public QObject {
     Q_OBJECT
@@ -16,22 +17,26 @@ class RastreadorWeb : public QObject {
 public:
     explicit RastreadorWeb(GrafoWeb* grafo, QObject *parent = nullptr);
 
-    void iniciarRastreo(const QString& urlInicial, int profundidadMax);
+    void iniciarRastreo(const QString& urlInicial, int profundidadMax, int concurrenciaMax);
     void detenerRastreo();
 
 signals:
     void enlaceDescubierto(const QString& url);
     void rastreoFinalizado();
     void error(const QString& mensaje);
+    void paginaDescargada(const QString& url, const QString& html);
+    void tiempoTranscurrido(const QString& tiempoStr);
 
 private slots:
     void alTerminarDescarga(QNetworkReply* reply);
 
 private:
     int peticionesActivas;
-    const int MAX_PETICIONES_SIMULTANEAS = 4;
     GrafoWeb* grafoEnMemoria;
     QNetworkAccessManager* networkManager;
+    QElapsedTimer cronometro;
+
+
 
     struct NodoRastreo {
         QString url;
@@ -42,6 +47,7 @@ private:
 
     QString dominioObjetivo;
     int limiteProfundidad;
+    int limiteConcurrencia;
     bool rastreoActivo;
 
     void procesarSiguiente();

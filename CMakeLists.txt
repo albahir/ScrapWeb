@@ -52,6 +52,11 @@ qt_add_executable(ProyectoScrapWeb
     CapaNegocio/GrafoWeb.cpp
     CapaNegocio/RastreadorWeb.h
     CapaNegocio/RastreadorWeb.cpp
+    CapaNegocio/IndiceInvertido.h
+    CapaNegocio/IndiceInvertido.cpp
+    CapaDatos/gestorArchivos.h
+    CapaDatos/gestorArchivos.cpp
+    CapaPresentacion/adaptadorgrafoarbol.h CapaPresentacion/adaptadorgrafoarbol.cpp
 
 )
 

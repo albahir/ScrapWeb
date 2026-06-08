@@ -1,5 +1,6 @@
 #include "GrafoWeb.h"
-
+#include "QQueue"
+#include "QSet"
 GrafoWeb::GrafoWeb() {
     totalAristas = 0;
 }
@@ -80,4 +81,34 @@ int GrafoWeb::cantidadAristas() const {
 
 const QHash<QString, QStringList>& GrafoWeb::obtenerEstructuraCompleta() const {
     return listaAdyacencia;
+}
+
+void GrafoWeb::calcularRutasDesdeRaiz(const QString& urlOrigen,
+                                      QHash<QString, int>& distancias,
+                                      QHash<QString, QString>& padres) const {
+    distancias.clear();
+    padres.clear();
+
+    QString origenLimpio = urlOrigen;
+    if (origenLimpio.endsWith("/")) origenLimpio.chop(1);
+
+    if (!listaAdyacencia.contains(origenLimpio)) return;
+
+    QQueue<QString> cola;
+    cola.enqueue(origenLimpio);
+    distancias.insert(origenLimpio, 0);
+
+    while (!cola.isEmpty()) {
+        QString actual = cola.dequeue();
+        int distActual = distancias.value(actual);
+
+        QStringList adyacentes = listaAdyacencia.value(actual);
+        for (const QString& vecino : adyacentes) {
+            if (!distancias.contains(vecino)) {
+                distancias.insert(vecino, distActual + 1);
+                padres.insert(vecino, actual); // Guardamos quién es el predecesor directo
+                cola.enqueue(vecino);
+            }
+        }
+    }
 }
