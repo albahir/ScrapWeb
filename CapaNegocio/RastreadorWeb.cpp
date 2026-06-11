@@ -50,7 +50,10 @@ void RastreadorWeb::procesarSiguiente() {
     while (rastreoActivo && peticionesActivas < limiteConcurrencia && !colaPendientes.isEmpty()) {
 
         NodoRastreo nodoActual = colaPendientes.dequeue();
-        if (urlsVisitadas.contains(nodoActual.url)) continue;
+        if (urlsVisitadas.contains(nodoActual.url)) {
+            qDebug() << "    [Escudo Duplicados] 🛑 Atrapada y destruida en cola:" << nodoActual.url;
+            continue;
+        }
 
         urlsVisitadas.insert(nodoActual.url);
         emit enlaceDescubierto(nodoActual.url);

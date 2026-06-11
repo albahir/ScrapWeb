@@ -272,8 +272,9 @@ void VentanaPrincipal::iniciarMapeo() {
         urlInicial = "https://" + urlInicial; // Autocorrección para mejor UX
         txtUrl->setText(urlInicial); // Actualizamos la vista
     }
-
+    ultimoTiempoRastreo = "00:00";
     totalBytesContados = 0;
+    lblTiempoEjecucion->setText(" 00:00");
     lblPaginasEncontradas->setText("0");
     lblEnlacesDetectados->setText("0");
     lblDensidadConexiones->setText("0.00");
@@ -281,7 +282,7 @@ void VentanaPrincipal::iniciarMapeo() {
     lblPaginaMasConectada->setText("Calculando...");
     lblPaginaMasReferenciada->setText("Calculando...");
     lblEstado->setText("Estado: Mapeando...");
-    lblTiempoEjecucion->setText("⏱️ Tiempo de ejecución:\nCalculando...");
+    lblTiempoEjecucion->setText("Calculando...");
     cambiarEstadoUI(ESTADO_MAPEANDO);
 
     miIndiceInvertido->limpiar();
@@ -477,7 +478,7 @@ void VentanaPrincipal::actualizarPanelMetricas() {
     // Inyectamos los sumideros
     lblPaginasSumidero->setText(QString::number(reporte.paginasSumidero));
 
-    lblDensidadConexiones->setText(QString::number(reporte.densidadConexiones, 'f', 4));
+    lblDensidadConexiones->setText(QString::number(reporte.densidadConexiones, 'f', 2));
     lblTamanoDescargado->setText(reporte.tamanoTotal);
 
     // Inyectamos HTML para la página con más Salidas (Métrica 1)
