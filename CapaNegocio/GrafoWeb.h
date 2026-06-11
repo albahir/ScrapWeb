@@ -28,6 +28,7 @@ public:
     void calcularRutasDesdeRaiz(const QString& urlOrigen,
                                 QHash<QString, int>& distancias,
                                 QHash<QString, QString>& padres) const;
+    QStringList reconstruirRuta(const QString& urlOrigen, const QString& urlDestino, const QHash<QString, QString>& padres) const;
 private:
     // La Lista de Adyacencia:
     // La llave (Key) es la URL de origen.

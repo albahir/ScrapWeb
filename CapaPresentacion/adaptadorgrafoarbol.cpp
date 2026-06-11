@@ -5,28 +5,25 @@
 #include <QPair>
 
 void AdaptadorGrafoArbol::poblarModelo(GrafoWeb* grafo, QStandardItemModel* modelo, const QString& urlInicial) {
+    // 1. Limpiamos el modelo visual y apagamos temporalmente sus cálculos
     modelo->clear();
     modelo->setHorizontalHeaderLabels({"URL"});
 
-    // Limpiamos el slash de la URL inicial para asegurar coincidencia con el grafo
     QString urlLimpia = urlInicial;
-    if (urlLimpia.endsWith("/")) {
-        urlLimpia.chop(1);
-    }
+    if (urlLimpia.endsWith("/")) urlLimpia.chop(1);
 
     if (!grafo->contieneNodo(urlLimpia)) return;
 
-    // Nodo raíz del QTreeView
+    // 2. Creamos el nodo raíz
     QStandardItem *itemRaiz = new QStandardItem(urlLimpia);
-    modelo->appendRow(itemRaiz);
 
-    // Lógica de recorrido BFS (Anchura) adaptada para la interfaz visual
     QSet<QString> visitadosVisulamente;
     visitadosVisulamente.insert(urlLimpia);
 
     QQueue<QPair<QString, QStandardItem*>> cola;
     cola.enqueue({urlLimpia, itemRaiz});
 
+    // 3. Bucle BFS
     while (!cola.isEmpty()) {
         auto actual = cola.dequeue();
         QString urlActual = actual.first;
@@ -39,10 +36,13 @@ void AdaptadorGrafoArbol::poblarModelo(GrafoWeb* grafo, QStandardItemModel* mode
                 visitadosVisulamente.insert(urlHijo);
 
                 QStandardItem *itemHijo = new QStandardItem(urlHijo);
-                itemPadre->appendRow(itemHijo);
+                itemPadre->appendRow(itemHijo); // Se agrega al padre en memoria, no genera lag
 
                 cola.enqueue({urlHijo, itemHijo});
             }
         }
     }
+
+
+    modelo->appendRow(itemRaiz);
 }

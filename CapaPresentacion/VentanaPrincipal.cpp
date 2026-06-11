@@ -1,6 +1,8 @@
 #include "VentanaPrincipal.h"
 #include "AdaptadorGrafoArbol.h"
 #include "gestorarchivos.h"
+#include "AnalizadorMetricas.h"
+#include "MetricasSitio.h"
 #include <QFormLayout>
 #include <QHeaderView>
 
@@ -34,11 +36,23 @@ VentanaPrincipal::VentanaPrincipal(QWidget *parent) : QMainWindow(parent) {
 
         lblEstado->setText(msg);
     });
-    connect(rastreador, &RastreadorWeb::tiempoTranscurrido, this, [this](const QString& tiempoStr){
-        lblTiempoEjecucion->setText("⏱️ Tiempo de ejecución:\n" + tiempoStr);
-    });
+
+    connect(rastreador, &RastreadorWeb::tiempoTranscurrido, this, &VentanaPrincipal::onTiempoTranscurrido);
     connect(btnGuardar, &QPushButton::clicked, this, &VentanaPrincipal::guardarHistorial);
     connect(btnCargar, &QPushButton::clicked, this, &VentanaPrincipal::cargarHistorial);
+    connect(rastreador, &RastreadorWeb::error, this, [this](const QString& msg){
+        if (msg.startsWith("CRITICO: ")) {
+            // 1. Mostramos ventana roja de alerta nativa
+            // Usamos mid(9) para borrar la palabra "CRITICO: " del mensaje visual
+            QMessageBox::critical(this, "Error de Conexión", msg.mid(9));
+
+            // 2. Abortamos automáticamente el mapeo en la Interfaz y el Motor
+            detenerMapeo();
+        } else {
+            // Para errores de enlaces menores, solo actualizamos el texto de la esquina inferior
+            lblEstado->setText(msg);
+        }
+    });
 }
 
 VentanaPrincipal::~VentanaPrincipal() {
@@ -58,7 +72,11 @@ void VentanaPrincipal::configurarInterfaz() {
     connect(btnIniciar, &QPushButton::clicked, this, &VentanaPrincipal::iniciarMapeo);
     connect(btnDetener, &QPushButton::clicked, this, &VentanaPrincipal::detenerMapeo);
     connect(btnBuscar, &QPushButton::clicked, this, &VentanaPrincipal::buscarPalabra);
+
+    aplicarEstilosGlobales();
+    cambiarEstadoUI(ESTADO_ESPERANDO);
 }
+
 QVBoxLayout* VentanaPrincipal::crearPanelIzquierdo() {
     QVBoxLayout *layout = new QVBoxLayout();
 
@@ -103,7 +121,10 @@ QVBoxLayout* VentanaPrincipal::crearPanelIzquierdo() {
 
     barraProgreso = new QProgressBar();
     barraProgreso->setValue(0);
+    barraProgreso->setMaximumWidth(300);
     lblEstado = new QLabel("Estado: Esperando...");
+    lblEstado->setMaximumWidth(300);
+    lblEstado->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     layout->addWidget(barraProgreso);
     layout->addWidget(lblEstado);
 
@@ -114,7 +135,15 @@ QVBoxLayout* VentanaPrincipal::crearPanelCentral() {
 
     QGroupBox *grupoEstructura = new QGroupBox("Estructura del Sitio (Mismo Dominio)");
     QVBoxLayout *layoutEstructura = new QVBoxLayout(grupoEstructura);
+    grupoEstructura->setFixedWidth(650);
+     grupoEstructura->setFixedHeight(400);
     arbolEstructura = new QTreeView();
+     arbolEstructura->setUniformRowHeights(true);
+
+     arbolEstructura->setAnimated(false);
+    arbolEstructura->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    arbolEstructura->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    arbolEstructura->header()->setStretchLastSection(false);
     layoutEstructura->addWidget(arbolEstructura);
     layout->addWidget(grupoEstructura, 2);
 
@@ -123,13 +152,27 @@ QVBoxLayout* VentanaPrincipal::crearPanelCentral() {
     QHBoxLayout *layoutBuscador = new QHBoxLayout();
 
     txtBuscar = new QLineEdit();
-    txtBuscar->setPlaceholderText("Ingrese palabra clave...");
-    btnBuscar = new QPushButton("🔍 Buscar Palabra");
+    txtBuscar->setPlaceholderText("Ingrese palabra clave a buscar...");
+
+    cmbFiltroBusqueda = new QComboBox();
+    cmbFiltroBusqueda->addItem("Global", "CONTENIDO");
+    cmbFiltroBusqueda->addItem("Solo en la URL", "URL");
+
+    btnBuscar = new QPushButton("🔍 Buscar");
+
+
+    // =========================================================
+    // 2. LAYOUT
+    // =========================================================
+
 
     layoutBuscador->addWidget(txtBuscar);
+    layoutBuscador->addWidget(cmbFiltroBusqueda);
     layoutBuscador->addWidget(btnBuscar);
+    layoutBuscador->setSpacing(8);
 
     listaResultadosBusqueda = new QListWidget();
+    listaResultadosBusqueda->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 
     layoutBusqueda->addLayout(layoutBuscador);
     layoutBusqueda->addWidget(listaResultadosBusqueda);
@@ -142,33 +185,51 @@ QVBoxLayout* VentanaPrincipal::crearPanelDerecho() {
     QVBoxLayout *layout = new QVBoxLayout();
 
     // =========================================================
-    // 1. Grupo de Métricas Estructurales
+    // 1. Grupo de Métricas Estructurales (Usando QFormLayout)
     // =========================================================
     QGroupBox *grupoMetricas = new QGroupBox("Métricas Estructurales");
-    QVBoxLayout *layoutMetricas = new QVBoxLayout(grupoMetricas);
-    layoutMetricas->setAlignment(Qt::AlignTop);
+    QFormLayout *layoutMetricas = new QFormLayout(grupoMetricas);
+    grupoMetricas->setFixedWidth(300);
 
-    lblTotalPaginas = new QLabel("📄 Páginas Totales: 0");
-    lblProfundidadMax = new QLabel("🔀 Profundidad Máxima: 0");
-    lblMasEnlaces = new QLabel("🔗 Página con más Enlaces:\nN/A (0)");
-    lblTamanoTotal = new QLabel("💾 Tamaño Estimado:\n0.0 MB");
-    lblTiempoEjecucion = new QLabel("⏱️ Tiempo de ejecución:\n0.00s");
+    // Inicialización de labels numéricos comunes
+    lblTiempoEjecucion = new QLabel("00:00", this);
+    lblPaginasEncontradas = new QLabel("0", this);
+    lblEnlacesDetectados = new QLabel("0", this);
+    lblDensidadConexiones = new QLabel("0.00", this);
+    lblPaginasSumidero = new QLabel("0", this);
+    lblTamanoDescargado = new QLabel("0 KB", this);
 
-    // Estilos
-    QString estiloMetrica = "font-size: 12px; margin-bottom: 15px;";
-    lblTotalPaginas->setStyleSheet(estiloMetrica);
-    lblProfundidadMax->setStyleSheet(estiloMetrica);
-    lblMasEnlaces->setStyleSheet(estiloMetrica);
-    lblTamanoTotal->setStyleSheet(estiloMetrica);
-    lblTiempoEjecucion->setStyleSheet(estiloMetrica);
+    // Configuración compacta de la Métrica 1 (Enlaces Salientes)
+    lblPaginaMasConectada = new QLabel(this);
+    lblPaginaMasConectada->setWordWrap(true);
+    lblPaginaMasConectada->setTextFormat(Qt::RichText);
+    lblPaginaMasConectada->setText(
+        "<span style='color: #2d3748; font-weight: bold;'>Página con más salidas:</span><br>"
+        "<small style='color: #718096; font-size: 10px;'>Ninguna</small>"
+        );
 
-    // Agregamos las métricas a su grupo
-    layoutMetricas->addWidget(lblTotalPaginas);
-    layoutMetricas->addWidget(lblProfundidadMax);
-    layoutMetricas->addWidget(lblMasEnlaces);
-    layoutMetricas->addWidget(lblTamanoTotal);
-    layoutMetricas->addWidget(lblTiempoEjecucion);
+    // Configuración compacta de la Métrica 2 (Enlaces Entrantes) - NUEVA
+    lblPaginaMasReferenciada = new QLabel(this);
+    lblPaginaMasReferenciada->setWordWrap(true);
+    lblPaginaMasReferenciada->setTextFormat(Qt::RichText);
+    lblPaginaMasReferenciada->setText(
+        "<span style='color: #2d3748; font-weight: bold;'>Página más referenciada:</span><br>"
+        "<small style='color: #718096; font-size: 10px;'>Ninguna (0 enlaces)</small>"
+        );
 
+    // Columnas estándar del formulario
+    layoutMetricas->addRow("Tiempo de ejecución:", lblTiempoEjecucion);
+    layoutMetricas->addRow("Páginas encontradas:", lblPaginasEncontradas);
+    layoutMetricas->addRow("Enlaces detectados:", lblEnlacesDetectados);
+    layoutMetricas->addRow("Páginas sumidero:", lblPaginasSumidero);
+    layoutMetricas->addRow("Densidad de conexiones:", lblDensidadConexiones);
+    layoutMetricas->addRow("Tamaño total:", lblTamanoDescargado);
+
+    // Filas de ancho completo en la parte inferior para los enlaces
+    layoutMetricas->addRow(lblPaginaMasConectada);
+    layoutMetricas->addRow(lblPaginaMasReferenciada);
+
+    grupoMetricas->setMaximumWidth(270); // Blindaje visual definitivo
     layout->addWidget(grupoMetricas);
 
     // =========================================================
@@ -199,6 +260,7 @@ QVBoxLayout* VentanaPrincipal::crearPanelDerecho() {
 void VentanaPrincipal::iniciarMapeo() {
     QString urlInicial = txtUrl->text().trimmed();
 
+
     // 2. Validación de vacío
     if(urlInicial.isEmpty()) {
         lblEstado->setText("Error: La URL no puede estar vacía.");
@@ -211,12 +273,16 @@ void VentanaPrincipal::iniciarMapeo() {
         txtUrl->setText(urlInicial); // Actualizamos la vista
     }
 
+    totalBytesContados = 0;
+    lblPaginasEncontradas->setText("0");
+    lblEnlacesDetectados->setText("0");
+    lblDensidadConexiones->setText("0.00");
+    lblTamanoDescargado->setText("0 KB");
+    lblPaginaMasConectada->setText("Calculando...");
+    lblPaginaMasReferenciada->setText("Calculando...");
     lblEstado->setText("Estado: Mapeando...");
     lblTiempoEjecucion->setText("⏱️ Tiempo de ejecución:\nCalculando...");
-    btnIniciar->setEnabled(false);
-    btnDetener->setEnabled(true);
-    barraProgreso->setMinimum(0);
-    barraProgreso->setMaximum(0); // Hace que la barra se mueva indefinidamente
+    cambiarEstadoUI(ESTADO_MAPEANDO);
 
     miIndiceInvertido->limpiar();
     modeloArbol->clear(); // Limpiar árbol anterior
@@ -233,11 +299,25 @@ void VentanaPrincipal::iniciarMapeo() {
 }
 
 void VentanaPrincipal::detenerMapeo() {
-    lblEstado->setText("Estado: Detenido.");
-    btnIniciar->setEnabled(true);
-    btnDetener->setEnabled(false);
-    barraProgreso->setValue(0);
+    rastreador->detenerRastreo();
 
+
+    lblEstado->setText("Estado: Detenido por el usuario. Rescatando datos parciales...");
+    cambiarEstadoUI(ESTADO_CANCELADO);
+
+
+    QString urlBase = txtUrl->text().trimmed();
+    if(!urlBase.startsWith("http")) urlBase = "https://" + urlBase;
+
+    arbolEstructura->setUpdatesEnabled(false);
+    AdaptadorGrafoArbol::poblarModelo(grafo, modeloArbol, urlBase);
+    arbolEstructura->setUpdatesEnabled(true);
+    arbolEstructura->expandToDepth(0);
+
+    ultimoTiempoRastreo = "Cancelado";
+    actualizarPanelMetricas();
+
+    lblEstado->setText("Estado: Detenido. Datos parciales mostrados.");
 }
 
 void VentanaPrincipal::buscarPalabra() {
@@ -248,70 +328,83 @@ void VentanaPrincipal::buscarPalabra() {
     if (palabraObjetivo.isEmpty() || urlInicial.isEmpty()) return;
     if (urlInicial.endsWith("/")) urlInicial.chop(1);
 
-    // 1. EL ÍNDICE INVERTIDO FILTRA: Páginas con la palabra en su contenido HTML
-    QStringList urlsConPalabra = miIndiceInvertido->buscar(palabraObjetivo);
-
-    if (urlsConPalabra.isEmpty()) {
-        listaResultadosBusqueda->addItem("❌ No se encontraron páginas con esa palabra clave.");
-        return;
-    }
-
-    // 2. EL BFS ENRUTA: Calculamos distancias y padres desde la raíz una sola vez
+    // =========================================================
+    // 1. EL BFS ENRUTA PRIMERO
+    // Esto hace el recorrido y nos regala todas las URLs conocidas
+    // =========================================================
     QHash<QString, int> mapaDistancias;
     QHash<QString, QString> mapaPadres;
     grafo->calcularRutasDesdeRaiz(urlInicial, mapaDistancias, mapaPadres);
 
+
+
+    // =========================================================
+    // 2. EL CONDICIONAL DE BÚSQUEDA (Reutilizando funciones)
+    // =========================================================
+    // === USAMOS UN QSET PARA HACERLO ULTRA VELOZ Y EVITAR DUPLICADOS NATIVAMENTE ===
+    QSet<QString> conjuntoResultados;
+    QString modoBusqueda = cmbFiltroBusqueda->currentData().toString();
+
+    // PASO A: Si es "Sin Filtro", cargamos el contenido primero
+    if (modoBusqueda == "CONTENIDO") {
+        QStringList contenidoEncontrado = miIndiceInvertido->buscar(palabraObjetivo);
+        for(const QString& url : contenidoEncontrado) {
+            conjuntoResultados.insert(url);
+        }
+    }
+
+    //  FOR LIBRE Se ejecuta de forma lineal para ambos casos
+    for (const QString& url : mapaDistancias.keys()) {
+        if (url.contains(palabraObjetivo, Qt::CaseInsensitive)) {
+            // QSet inserta instantáneamente. Si ya existía por el PASO A,
+            // simplemente lo ignora de forma segura. ¡Cero duplicados, cero lag!
+            conjuntoResultados.insert(url);
+        }
+    }
+
+    // Convertimos el conjunto final a una lista
+    QList<QString> urlsDestino = conjuntoResultados.values();
+
+    if (urlsDestino.isEmpty()) {
+        listaResultadosBusqueda->addItem("❌ No se encontraron coincidencias para la búsqueda.");
+        return;
+    }
+
+    // =========================================================
+    //  FUSIÓN Y TRAZADO JERÁRQUICO
+    // =========================================================
     bool algunaRutaValida = false;
 
-    // 3. FUSIÓN Y TRAZADO JERÁRQUICO
-    for (const QString& urlDestino : urlsConPalabra) {
-        // Ignorar si la URL no es alcanzable desde la raíz seleccionada
+    for (const QString& urlDestino : urlsDestino) {
         if (!mapaDistancias.contains(urlDestino) && urlDestino != urlInicial) {
             continue;
         }
 
+        // DELEGACIÓN PURA: El Grafo calcula la ruta matemática, nosotros solo la dibujamos
+        QStringList ruta = grafo->reconstruirRuta(urlInicial, urlDestino, mapaPadres);
+        if (ruta.isEmpty()) continue;
+
         algunaRutaValida = true;
-        QStringList ruta;
-        QString pasoActual = urlDestino;
-
-        // Trazamos el camino hacia atrás usando el diccionario de padres del BFS
-        while (pasoActual != urlInicial && mapaPadres.contains(pasoActual)) {
-            ruta.prepend(pasoActual); // Insertamos al inicio para ordenar de raíz a destino
-            pasoActual = mapaPadres.value(pasoActual);
-        }
-        ruta.prepend(urlInicial); // Añadimos el nodo raíz al inicio
-
         int clics = mapaDistancias.value(urlDestino, 0);
 
-        // --- ENCABEZADO DEL RESULTADO ---
-        QString infoMetricas = QString("📌 [Destino Encontrado | Clics mínimos: %1]").arg(clics);
-        listaResultadosBusqueda->addItem(infoMetricas);
+        listaResultadosBusqueda->addItem(QString("📌 [Destino Encontrado | Clics mínimos: %1]").arg(clics));
 
-        // --- IMPRESIÓN JERÁRQUICA (Tu lógica adaptada) ---
         for (int i = 0; i < ruta.size(); ++i) {
-            QString espaciado = QString("   ").repeated(i); // 3 espacios por nivel de profundidad
+            QString espaciado = QString("   ").repeated(i);
             QString vineta = (i == 0) ? "🌐 " : "↳ ";
-
-            // Añadimos cada eslabón de la ruta como un elemento individual abajo del otro
             listaResultadosBusqueda->addItem(espaciado + vineta + ruta[i]);
         }
-
-        // Añadimos una línea sutil de separación para no amontonar si hay más de una ruta
         listaResultadosBusqueda->addItem("--------------------------------------------------------------------------------");
     }
 
-    if (!algunaRutaValida) {
-        listaResultadosBusqueda->addItem("⚠ La palabra existe en el índice, pero ninguna página es alcanzable desde la raíz.");
-    }
 }
-
 void VentanaPrincipal::onEnlaceDescubierto(const QString& url) {
     // 1. Tomamos el tamaño actual que tiene el texto del estado
     QFontMetrics metricas(lblEstado->font());
 
     // 2. Si la URL es más ancha que el espacio disponible, le pone "..." al final
     // Le restamos unos 20 pixeles por margen de seguridad
-    QString textoCortado = metricas.elidedText("Encontrado: " + url, Qt::ElideRight, lblEstado->width() - 20);
+    QString textoCortado = metricas.elidedText("Encontrado: " + url, Qt::ElideRight, 290);
 
     // 3. Mostramos el texto cortado en la interfaz
     lblEstado->setText(textoCortado);
@@ -320,21 +413,20 @@ void VentanaPrincipal::onEnlaceDescubierto(const QString& url) {
 }
 
 void VentanaPrincipal::onRastreoFinalizado() {
-    lblEstado->setText("Estado: Mapeo completado.");
-    btnIniciar->setEnabled(true);
-    btnDetener->setEnabled(false);
-    barraProgreso->setMaximum(100);
-    barraProgreso->setValue(100);
-
+    lblEstado->setText("Estado: Mapeo completado. Analizando métricas...");
+   cambiarEstadoUI(ESTADO_FINALIZADO);
     // DELEGACIÓN: El adaptador se encarga de convertir el Grafo al Árbol
     QString urlBase = txtUrl->text().trimmed();
     if(!urlBase.startsWith("http")) urlBase = "https://" + urlBase;
-
+    arbolEstructura->setUpdatesEnabled(false);
     AdaptadorGrafoArbol::poblarModelo(grafo, modeloArbol, urlBase);
-    arbolEstructura->expandAll();
+    arbolEstructura->setUpdatesEnabled(true);
+   arbolEstructura->expandToDepth(0);
 
-    // Actualización de métricas
-    lblTotalPaginas->setText("📄 Páginas Totales: " + QString::number(grafo->cantidadNodos()));
+    actualizarPanelMetricas();
+
+    lblEstado->setText("Sistema listo. En espera.");
+
 }
 
 void VentanaPrincipal::onPaginaDescargada(const QString& url, const QString& html) {
@@ -348,6 +440,60 @@ void VentanaPrincipal::onPaginaDescargada(const QString& url, const QString& htm
     // y el HTML que el rastreador acaba de descargar.
     if (miIndiceInvertido) {
         miIndiceInvertido->indexarPagina(urlLimpia, html);
+    }
+    totalBytesContados += html.toUtf8().size();
+    actualizarPanelMetricas();
+}
+
+void VentanaPrincipal::onTiempoTranscurrido(const QString& tiempoStr) {
+    ultimoTiempoRastreo = tiempoStr;
+    actualizarPanelMetricas();
+}
+
+void VentanaPrincipal::actualizarPanelMetricas() {
+    // Evita calcular si el grafo está vacío
+
+
+    // === 2. BARRERA DE SEGURIDAD PARA EL GRAFO ===
+    // Si el grafo está vacío (segundos iniciales), salimos AQUÍ de forma segura.
+    // El reloj ya se pintó, así que el usuario verá el segundero moverse en vivo.
+    if (!grafo || grafo->cantidadNodos() == 0) {
+        lblTiempoEjecucion->setText(QString("00:00"));
+        lblPaginasEncontradas->setText("Páginas encontradas: 0");
+        lblEnlacesDetectados->setText("Enlaces detectados: 0");
+        lblPaginasSumidero->setText("0");
+        lblDensidadConexiones->setText("0.00");
+        lblTamanoDescargado->setText("Tamaño descargado: 0 Bytes");
+
+    }else{
+
+    // Llamamos a la Capa de Negocio (AnalizadorMetricas)
+    MetricasSitio reporte = AnalizadorMetricas::generarReporte(grafo, ultimoTiempoRastreo, totalBytesContados);
+    // Volcamos a la UI
+    lblTiempoEjecucion->setText(QString(" %1").arg(reporte.tiempoEjecucion));
+    lblPaginasEncontradas->setText(QString::number(reporte.paginasEncontradas));
+    lblEnlacesDetectados->setText(QString::number(reporte.enlacesDetectados));
+
+    // Inyectamos los sumideros
+    lblPaginasSumidero->setText(QString::number(reporte.paginasSumidero));
+
+    lblDensidadConexiones->setText(QString::number(reporte.densidadConexiones, 'f', 4));
+    lblTamanoDescargado->setText(reporte.tamanoTotal);
+
+    // Inyectamos HTML para la página con más Salidas (Métrica 1)
+    QString formatoSalidas = QString(
+                                 "<span style='color: #2d3748; font-weight: bold;'>Página con más salidas:</span><br>"
+                                 "<span style='color: #4a5568; font-size: 10px; font-weight: normal;'>%1</span>"
+                                 ).arg(reporte.paginaMasConectada);
+    lblPaginaMasConectada->setText(formatoSalidas);
+
+    // Inyectamos HTML para la página más Referenciada (Métrica 2)
+    QString formatoEntradas = QString(
+                                  "<span style='color: #2d3748; font-weight: bold;'>Página más referenciada:</span><br>"
+                                  "<span style='color: #4a5568; font-size: 10px; font-weight: normal;'>%1 <b>(%2 enlaces)</b></span>"
+                                  ).arg(reporte.paginaMasReferenciada).arg(reporte.maxEnlacesRecibidos);
+    lblPaginaMasReferenciada->setText(formatoEntradas);
+
     }
 }
 
@@ -375,24 +521,30 @@ void VentanaPrincipal::guardarHistorial() {
 
     if (ruta.isEmpty()) return; // El usuario canceló o cerró la ventana
 
-    // 3. RECOPILACIÓN DE METADATOS (Para el contenido del archivo)
     QString fechaHoraReporte = QDateTime::currentDateTime().toString("dd/MM/yyyy - hh:mm:ss AP");
-    QString masEnlaces = lblMasEnlaces->text().replace("\n", " ");
-    QString tiempoEjec = lblTiempoEjecucion->text().replace("\n", " ");
-    QString tamanoEst = lblTamanoTotal->text().replace("\n", " ");
+
+    // Recopilar la información usando los labels vigentes
+    QString paginasEnc = lblPaginasEncontradas->text();
+    QString enlacesDet = lblEnlacesDetectados->text();
+    QString sumiderosTxt = lblPaginasSumidero->text();
+    QString densidadCon = lblDensidadConexiones->text();
+    QString tamanoDesc = lblTamanoDescargado->text();
+    QString masConectada = lblPaginaMasConectada->text();
 
     QString metadatos =
-        "# Fecha de Mapeo       : " + fechaHoraReporte + "\n" +
-        "# URL Raíz             : " + txtUrl->text().trimmed() + "\n" +
-        "# Límite Profundidad   : " + QString::number(spinProfundidad->value()) + " niveles\n" +
-        "# Hilos Concurrentes   : " + QString::number(spinConcurrencia->value()) + "\n" +
+        "# Fecha de Mapeo         : " + fechaHoraReporte + "\n" +
+        "# URL Raíz               : " + txtUrl->text().trimmed() + "\n" +
+        "# Límite Profundidad     : " + QString::number(spinProfundidad->value()) + " niveles\n" +
+        "# Hilos Concurrentes     : " + QString::number(spinConcurrencia->value()) + "\n" +
         "#\n" +
         "# --- RENDIMIENTO Y MÉTRICAS ---\n" +
-        "# " + lblTotalPaginas->text() + "\n" +
-        "# " + lblProfundidadMax->text() + "\n" +
-        "# " + masEnlaces + "\n" +
-        "# " + tamanoEst + "\n" +
-        "# " + tiempoEjec;
+        "# Páginas encontradas    : " + paginasEnc + "\n" +
+        "# Enlaces detectados     : " + enlacesDet + "\n" +
+        "# Páginas sumidero       : " + sumiderosTxt + "\n" +
+        "# Densidad de conexiones : " + densidadCon + "\n" +
+        "# Tamaño del contenido   : " + tamanoDesc + "\n" +
+        "# Página más conectada   : " + masConectada + "\n" +
+        "# Tiempo de ejecución    : " + ultimoTiempoRastreo;
 
     // 4. GUARDAR Y NOTIFICAR
     if (GestorArchivos::guardarGrafo(ruta, *grafo, metadatos)) {
@@ -412,6 +564,18 @@ void VentanaPrincipal::guardarHistorial() {
     }
 }
 void VentanaPrincipal::cargarHistorial() {
+
+    if (grafo->cantidadNodos() > 0) {
+        QMessageBox::StandardButton respuesta;
+        respuesta = QMessageBox::question(this, "Datos existentes",
+                                          "Ya tienes un sitio mapeado en memoria.\n"
+                                          "¿Estás seguro de que deseas sobrescribirlo con un nuevo archivo? "
+                                          "Cualquier progreso no guardado se perderá.",
+                                          QMessageBox::Yes | QMessageBox::No);
+        if (respuesta == QMessageBox::No) {
+            return; // El usuario se arrepintió, cancelamos la carga.
+        }
+    }
     QString ruta = QFileDialog::getOpenFileName(
         this, "Cargar Estructura de Grafo", "", "Archivos de texto (*.txt);;Todos los archivos (*)"
         );
@@ -429,10 +593,11 @@ void VentanaPrincipal::cargarHistorial() {
         } else {
             urlRaizRecuperada = txtUrl->text().trimmed(); // Fallback de seguridad
         }
-
+        arbolEstructura->setUpdatesEnabled(false);
         // 2. DIBUJAMOS EL ÁRBOL
         AdaptadorGrafoArbol::poblarModelo(grafo, modeloArbol, urlRaizRecuperada);
-        arbolEstructura->expandAll();
+        arbolEstructura->setUpdatesEnabled(true);
+        arbolEstructura->expandToDepth(0);
 
         // 3. LIMPIEZA TOTAL DE UI (Evitar datos basura del escaneo anterior)
         miIndiceInvertido->limpiar();
@@ -444,9 +609,15 @@ void VentanaPrincipal::cargarHistorial() {
         barraProgreso->setValue(100);
         lblEstado->setText("Estado: Archivo cargado.");
 
-        // 4. ACTUALIZAR MÉTRICAS
-        lblTotalPaginas->setText("📄 Páginas Totales: " + QString::number(grafo->cantidadNodos()));
+        // Actualizar métricas básicas recuperables en los  labels
+        lblPaginasEncontradas->setText(QString::number(grafo->cantidadNodos()));
+        lblEnlacesDetectados->setText(QString::number(grafo->cantidadAristas()));
 
+        double dens = (grafo->cantidadNodos() > 0) ? (double)grafo->cantidadAristas() / grafo->cantidadNodos() : 0.0;
+        lblDensidadConexiones->setText(QString::number(dens, 'f', 2));
+
+        lblTamanoDescargado->setText("N/A (Historial)");
+        lblPaginaMasConectada->setText("N/A (Historial)");
         QMessageBox::information(this, "Carga Exitosa",
                                  QString("Se ha restaurado el grafo desde el archivo.\n\nRaíz: %1\nNodos: %2\nEnlaces: %3")
                                      .arg(urlRaizRecuperada)
@@ -457,4 +628,75 @@ void VentanaPrincipal::cargarHistorial() {
     } else {
         QMessageBox::critical(this, "Error", "El archivo seleccionado no tiene un formato válido o está corrupto.");
     }
+}
+// =========================================================
+// MÁQUINA DE ESTADOS (Controlador centralizado de UI)
+// =========================================================
+void VentanaPrincipal::cambiarEstadoUI(EstadoAplicacion estado) {
+    bool hayDatosGuardables = (grafo && grafo->cantidadNodos() > 0);
+
+    switch (estado) {
+    case ESTADO_ESPERANDO:
+        btnIniciar->setEnabled(true);
+        btnDetener->setEnabled(false);
+        btnGuardar->setEnabled(hayDatosGuardables);
+        btnCargar->setEnabled(true);
+        barraProgreso->setValue(0);
+        break;
+
+    case ESTADO_MAPEANDO:
+        btnIniciar->setEnabled(false);
+        btnDetener->setEnabled(true);
+        btnGuardar->setEnabled(false); // Bloqueo de seguridad
+        btnCargar->setEnabled(false);  // Bloqueo de seguridad
+        barraProgreso->setMinimum(0);
+        barraProgreso->setMaximum(0);  // Modo cargando (infinito)
+        break;
+
+    case ESTADO_FINALIZADO:
+        btnIniciar->setEnabled(true);
+        btnDetener->setEnabled(false);
+        btnGuardar->setEnabled(true);
+        btnCargar->setEnabled(true);
+        barraProgreso->setMaximum(100);
+        barraProgreso->setValue(100);
+        break;
+
+    case ESTADO_CANCELADO:
+        btnIniciar->setEnabled(true);
+        btnDetener->setEnabled(false);
+        btnGuardar->setEnabled(true);
+        btnCargar->setEnabled(true);
+        barraProgreso->setMaximum(100);
+        barraProgreso->setValue(0);
+        break;
+    }
+}
+
+// =========================================================
+// HOJA DE ESTILOS CENTRALIZADA (Limpia los paneles visuales)
+// =========================================================
+void VentanaPrincipal::aplicarEstilosGlobales() {
+    // Botones Izquierdos
+    btnIniciar->setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;");
+
+    // Botones Archivo
+    btnGuardar->setStyleSheet("background-color: #2ecc71; color: white; font-weight: bold;");
+    btnCargar->setStyleSheet("background-color: #3498db; color: white; font-weight: bold;");
+
+    // Buscador y Filtros
+    txtBuscar->setStyleSheet(
+        "QLineEdit { border: 1px solid #B0BEC5; border-radius: 4px; padding: 6px 10px; font-size: 13px; background-color: #111111; }"
+        "QLineEdit:focus { border: 2px solid #2196F3; }"
+        );
+
+    cmbFiltroBusqueda->setStyleSheet(
+        "QComboBox { border: 1px solid #B0BEC5; border-radius: 4px; padding: 5px 10px; font-size: 13px; background-color: #111111; min-width: 160px; }"
+        "QComboBox:focus { border: 2px solid #2196F3; }"
+        );
+
+    btnBuscar->setStyleSheet(
+        "QPushButton { background-color: #2196F3; color: white; border: none; border-radius: 4px; padding: 6px 16px; font-weight: bold; font-size: 13px; }"
+        "QPushButton:hover { background-color: #1976D2; }"
+        );
 }

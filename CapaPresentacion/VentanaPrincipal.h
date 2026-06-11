@@ -12,9 +12,12 @@
 #include <QProgressBar>
 #include <QLabel>
 #include <QGroupBox>
+#include <QComboBox>
 #include "GrafoWeb.h"
 #include "RastreadorWeb.h"
 #include "IndiceInvertido.h"
+#include "AnalizadorMetricas.h" // Enlaza el motor de métricas
+#include "MetricasSitio.h"
 #include <QStandardItemModel>
 
 
@@ -24,6 +27,12 @@ class VentanaPrincipal : public QMainWindow {
 public:
     explicit VentanaPrincipal(QWidget *parent = nullptr);
     ~VentanaPrincipal();
+    enum EstadoAplicacion {
+        ESTADO_ESPERANDO,
+        ESTADO_MAPEANDO,
+        ESTADO_FINALIZADO,
+        ESTADO_CANCELADO
+    };
 
 private slots:
 
@@ -33,6 +42,8 @@ private slots:
     void onEnlaceDescubierto(const QString& url);
     void onRastreoFinalizado();
     void onPaginaDescargada(const QString& url, const QString& html);
+    void onTiempoTranscurrido(const QString& tiempoStr);
+    void actualizarPanelMetricas();
     void guardarHistorial();
     void cargarHistorial();
 
@@ -62,13 +73,22 @@ private:
     QLineEdit *txtBuscar;
     QPushButton *btnBuscar;
     QListWidget *listaResultadosBusqueda;
+    QComboBox *cmbFiltroBusqueda;
+    void cambiarEstadoUI(EstadoAplicacion estado);
+    void aplicarEstilosGlobales();
 
     // --- Elementos del Panel Derecho (Métricas) ---
-    QLabel *lblTotalPaginas;
-    QLabel *lblProfundidadMax;
-    QLabel *lblMasEnlaces;
-    QLabel *lblTamanoTotal;
     QLabel *lblTiempoEjecucion;
+    QLabel *lblPaginasEncontradas;
+    QLabel *lblEnlacesDetectados;
+    QLabel *lblDensidadConexiones;
+    QLabel *lblTamanoDescargado;
+    QLabel *lblPaginaMasConectada;
+    QLabel *lblPaginaMasReferenciada;
+    QLabel *lblPaginasSumidero;
+    //  Guarda el string de tiempo final para el cálculo estadístico
+    QString ultimoTiempoRastreo;
+    qint64 totalBytesContados = 0;
 
 
 };

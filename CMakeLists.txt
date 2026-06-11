@@ -57,6 +57,8 @@ qt_add_executable(ProyectoScrapWeb
     CapaDatos/gestorArchivos.h
     CapaDatos/gestorArchivos.cpp
     CapaPresentacion/adaptadorgrafoarbol.h CapaPresentacion/adaptadorgrafoarbol.cpp
+    CapaNegocio/MetricasSitio.h
+    CapaNegocio/AnalizadorMetricas.cpp
 
 )
 

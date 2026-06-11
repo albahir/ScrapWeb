@@ -112,3 +112,22 @@ void GrafoWeb::calcularRutasDesdeRaiz(const QString& urlOrigen,
         }
     }
 }
+QStringList GrafoWeb::reconstruirRuta(const QString& urlOrigen, const QString& urlDestino, const QHash<QString, QString>& padres) const {
+    QStringList ruta;
+    QString pasoActual = urlDestino;
+
+    // Navegamos hacia atrás usando el diccionario de padres
+    while (pasoActual != urlOrigen && padres.contains(pasoActual)) {
+        ruta.prepend(pasoActual);
+        pasoActual = padres.value(pasoActual);
+    }
+
+    // Validamos que realmente hayamos llegado a la raíz
+    if (pasoActual == urlOrigen) {
+        ruta.prepend(urlOrigen);
+    } else {
+        ruta.clear(); // Ruta inválida o inalcanzable
+    }
+
+    return ruta;
+}

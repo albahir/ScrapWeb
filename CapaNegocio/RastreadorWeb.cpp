@@ -63,6 +63,9 @@ void RastreadorWeb::procesarSiguiente() {
         QNetworkRequest peticion((QUrl(nodoActual.url)));
         peticion.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
         peticion.setAttribute(QNetworkRequest::User, nodoActual.profundidad);
+        #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+        peticion.setTransferTimeout(10000);
+        #endif
 
         peticionesActivas++; // Incrementamos el contador
 
@@ -72,14 +75,17 @@ void RastreadorWeb::procesarSiguiente() {
         networkManager->get(peticion);
     }
 
+
     // Si ya no hay nada en cola y no hay descargas activas, terminamos
     if (rastreoActivo && colaPendientes.isEmpty() && peticionesActivas == 0) {
         // 1. Calculamos el tiempo total en milisegundos
         qint64 milisegundos = cronometro.elapsed();
         double segundos = milisegundos / 1000.0;
 
+
         // 2. Formateamos el texto (ejemplo: "2.45s")
         QString tiempoTexto = QString::number(segundos, 'f', 2) + "s";
+
 
         // 3. LOG DE CONSOLA EXPANDIDO (Como lo pediste)
         qDebug() << "\n=====================================================";
@@ -87,9 +93,9 @@ void RastreadorWeb::procesarSiguiente() {
         qDebug() << "[Rastreador] ⏱️ Tiempo total de ejecución:" << tiempoTexto;
         qDebug() << "=====================================================\n";
 
+
         // 4. Enviamos el valor a la interfaz gráfica
         emit tiempoTranscurrido(tiempoTexto);
-
         emit rastreoFinalizado();
     }
 
@@ -137,8 +143,16 @@ void RastreadorWeb::alTerminarDescarga(QNetworkReply* reply) {
             extraerEnlaces(html, urlRespuesta, profundidadActual);
         }
     } else {
-        QString mensajeError = "Omitido (Error HTTP): " + urlPeticion.toString();
-        emit error(mensajeError);
+        QString errorString = reply->errorString();
+        qDebug() << "[Rastreador] ❌ ERROR de Red:" << urlPeticion.toString() << "->" << errorString;
+
+        if (profundidadActual == 0) {
+            // Si la página principal (nivel 0) falla, disparamos una alerta crítica.
+            emit error("CRITICO: El sitio web inicial no existe, está caído o sin conexión.\n\nDetalle técnico: " + errorString);
+        } else {
+            // Si un enlace "hijo" está roto, lo reportamos suavemente y el programa sigue mapeando el resto.
+            emit error("⚠️ Omitiendo enlace roto o lento: " + urlPeticion.host());
+        }
     }
 
     reply->deleteLater();
