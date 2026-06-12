@@ -14,7 +14,7 @@ public:
     static bool guardarGrafo(const QString& rutaArchivo, const GrafoWeb& grafo, const QString& metadatos = "");
 
 
-    static bool cargarGrafo(const QString& rutaArchivo, GrafoWeb& grafoDestino, QString& urlRaiz);
+    static bool cargarGrafo(const QString& rutaArchivo, GrafoWeb& grafoDestino, QString& urlRaiz, QString& tiempo, QString& tamano);
 };
 
 #endif // GESTORARCHIVOS_H

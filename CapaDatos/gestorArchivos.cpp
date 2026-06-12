@@ -39,23 +39,30 @@ bool GestorArchivos::guardarGrafo(const QString& rutaArchivo, const GrafoWeb& gr
     return true;
 }
 
-bool GestorArchivos::cargarGrafo(const QString& rutaArchivo, GrafoWeb& grafoDestino, QString& urlRaiz) {
+bool GestorArchivos::cargarGrafo(const QString& rutaArchivo, GrafoWeb& grafoDestino, QString& urlRaiz, QString& tiempo, QString& tamano) {
     QFile archivo(rutaArchivo);
     if (!archivo.open(QIODevice::ReadOnly | QIODevice::Text)) return false;
 
     QTextStream entrada(&archivo);
     entrada.setEncoding(QStringConverter::Utf8);
     grafoDestino.limpiar();
-    urlRaiz = ""; // Inicializamos vacía
+    urlRaiz = "";
+    tiempo = "00:00";
+    tamano = "0 KB";
 
     while (!entrada.atEnd()) {
         QString linea = entrada.readLine().trimmed();
 
-        // MAGIA: Si la línea es un comentario que contiene la URL Raíz, la guardamos
         if (linea.startsWith("# URL Raíz")) {
-            // Separa por ":" y toma la última parte (ej. "# URL Raíz : https://ejemplo.com")
-            // Usamos remove() para limpiar espacios extras.
             urlRaiz = linea.section(':', 1).trimmed();
+            continue;
+        }
+        if (linea.startsWith("# Tamaño del contenido")) {
+            tamano = linea.section(':', 1).trimmed();
+            continue;
+        }
+        if (linea.startsWith("# Tiempo de ejecución")) {
+            tiempo = linea.section(':', 1).trimmed();
             continue;
         }
 
@@ -68,8 +75,7 @@ bool GestorArchivos::cargarGrafo(const QString& rutaArchivo, GrafoWeb& grafoDest
         if (urlOrigen.endsWith("/")) urlOrigen.chop(1);
         grafoDestino.agregarNodo(urlOrigen);
 
-        // Si el archivo viejo no tenía metadatos, asumimos la primera línea leída como raíz
-        if (urlRaiz.isEmpty()) urlRaiz = urlOrigen;
+        if (urlRaiz.isEmpty()) urlRaiz = urlOrigen; // Fallback
 
         if (partes.size() > 1) {
             QStringList destinos = partes[1].split(" | ");

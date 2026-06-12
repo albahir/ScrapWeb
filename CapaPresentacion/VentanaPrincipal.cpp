@@ -584,46 +584,51 @@ void VentanaPrincipal::cargarHistorial() {
     if (ruta.isEmpty()) return;
 
     QString urlRaizRecuperada; // Aquí guardaremos la URL que el archivo nos dicte
+    QString tiempoRecuperado;
+    QString tamanoRecuperado;
 
-    // Llamamos a la capa de datos pasando nuestra nueva variable por referencia
-    if (GestorArchivos::cargarGrafo(ruta, *grafo, urlRaizRecuperada)) {
+    // Llamamos a la capa de datos pasando las variables por referencia
+    if (GestorArchivos::cargarGrafo(ruta, *grafo, urlRaizRecuperada, tiempoRecuperado, tamanoRecuperado)) {
 
-        // 1. ACTUALIZAMOS LA INTERFAZ CON LA URL DEL ARCHIVO
+        // 1. ACTUALIZAMOS LA INTERFAZ CON LA URL DEL ARCHIVO HISTÓRICO
         if (!urlRaizRecuperada.isEmpty()) {
             txtUrl->setText(urlRaizRecuperada);
         } else {
-            urlRaizRecuperada = txtUrl->text().trimmed(); // Fallback de seguridad
+            urlRaizRecuperada = txtUrl->text().trimmed();
         }
+
+        // 2. DIBUJAMOS EL ÁRBOL EN SEGUNDOS
         arbolEstructura->setUpdatesEnabled(false);
-        // 2. DIBUJAMOS EL ÁRBOL
         AdaptadorGrafoArbol::poblarModelo(grafo, modeloArbol, urlRaizRecuperada);
         arbolEstructura->setUpdatesEnabled(true);
         arbolEstructura->expandToDepth(0);
 
-        // 3. LIMPIEZA TOTAL DE UI (Evitar datos basura del escaneo anterior)
+        // 3. LIMPIEZA Y MENSAJES DEL BUSCADOR
         miIndiceInvertido->limpiar();
         listaResultadosBusqueda->clear();
         listaResultadosBusqueda->addItem("📂 Grafo recuperado desde archivo plano.");
-        listaResultadosBusqueda->addItem("⚠️ Nota: Las búsquedas de palabras requieren un rastreo en vivo.");
+        listaResultadosBusqueda->addItem("⚠️ Nota: Las búsquedas de contenido requieren un rastreo en vivo.");
 
-        lblTiempoEjecucion->setText("⏱️ Tiempo de ejecución:\nCargado de archivo");
-        barraProgreso->setValue(100);
+        // 4. CAMBIAMOS EL ESTADO DE LA APLICACIÓN
+        cambiarEstadoUI(ESTADO_FINALIZADO);
         lblEstado->setText("Estado: Archivo cargado.");
 
-        // Actualizar métricas básicas recuperables en los  labels
-        lblPaginasEncontradas->setText(QString::number(grafo->cantidadNodos()));
-        lblEnlacesDetectados->setText(QString::number(grafo->cantidadAristas()));
 
-        double dens = (grafo->cantidadNodos() > 0) ? (double)grafo->cantidadAristas() / grafo->cantidadNodos() : 0.0;
-        lblDensidadConexiones->setText(QString::number(dens, 'f', 2));
+        actualizarPanelMetricas();
 
-        lblTamanoDescargado->setText("N/A (Historial)");
-        lblPaginaMasConectada->setText("N/A (Historial)");
+
+        lblTiempoEjecucion->setText(QString(" %1").arg(tiempoRecuperado));
+        lblTamanoDescargado->setText(tamanoRecuperado);
+
+        // Sincronizamos la variable interna por seguridad
+        ultimoTiempoRastreo = tiempoRecuperado;
+
         QMessageBox::information(this, "Carga Exitosa",
-                                 QString("Se ha restaurado el grafo desde el archivo.\n\nRaíz: %1\nNodos: %2\nEnlaces: %3")
-                                     .arg(urlRaizRecuperada)
-                                     .arg(grafo->cantidadNodos())
-                                     .arg(grafo->cantidadAristas())
+                                 QString("Se ha restaurado el mapa del sitio exitosamente.\n\n"
+                                         "🌐 Raíz: %1\n"
+                                         "⏱️ Tiempo original: %2\n"
+                                         "💾 Tamaño original: %3")
+                                     .arg(urlRaizRecuperada, tiempoRecuperado, tamanoRecuperado)
                                  );
 
     } else {

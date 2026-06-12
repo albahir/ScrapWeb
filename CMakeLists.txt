@@ -60,6 +60,7 @@ qt_add_executable(ProyectoScrapWeb
     CapaNegocio/MetricasSitio.h
     CapaNegocio/AnalizadorMetricas.cpp
 
+
 )
 
 # ========================================================================
