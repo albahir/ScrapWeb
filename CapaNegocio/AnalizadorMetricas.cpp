@@ -1,6 +1,16 @@
 // Archivo: CapaNegocio/AnalizadorMetricas.cpp
 #include "AnalizadorMetricas.h"
 
+/**
+ * @brief Genera un reporte estadístico detallado sobre las métricas topológicas y de rendimiento del grafo web.
+ * @details Procesa de forma exhaustiva el grafo web para calcular la densidad de conexiones, el volumen de datos
+ * transferidos transformado a unidades legibles (KB/MB), la cantidad de páginas sumidero (dead ends), así como la
+ * identificación de los nodos con mayor grado de salida (out-degree) y de entrada (in-degree).
+ * @param grafo Puntero constante a la estructura GrafoWeb que almacena la red de páginas mapeadas.
+ * @param tiempo Cadena de texto formateada que representa la duración total del rastreo.
+ * @param bytesTotales Cantidad acumulada de bytes descargados a través de las peticiones de red.
+ * @return MetricasSitio Objeto estructurado que agrupa todos los indicadores estadísticos calculados.
+ */
 MetricasSitio AnalizadorMetricas::generarReporte(const GrafoWeb* grafo, const QString& tiempo, qint64 bytesTotales) {
     MetricasSitio reporte;
     reporte.tiempoEjecucion = tiempo;

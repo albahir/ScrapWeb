@@ -4,6 +4,15 @@
 #include <QSet>
 #include <QPair>
 
+/**
+ * @brief Transfiere de forma jerárquica la estructura del grafo web hacia el modelo de árbol visual.
+ * @details Limpia el modelo visual existente y realiza un recorrido en anchura (BFS) sobre el grafo web
+ * para mapear la red de páginas descubiertas como nodos jerárquicos de tipo QStandardItem. Utiliza un
+ * conjunto de visitados para evitar redundancias y ciclos infinitos durante el emparejamiento.
+ * @param grafo Puntero al objeto GrafoWeb que contiene la red de páginas y conexiones rastreadas.
+ * @param modelo Puntero al modelo estándar de Qt (QStandardItemModel) que será repoblado.
+ * @param urlInicial Dirección URL raíz que servirá como el nodo base principal en la vista de árbol.
+ */
 void AdaptadorGrafoArbol::poblarModelo(GrafoWeb* grafo, QStandardItemModel* modelo, const QString& urlInicial) {
     // 1. Limpiamos el modelo visual y apagamos temporalmente sus cálculos
     modelo->clear();

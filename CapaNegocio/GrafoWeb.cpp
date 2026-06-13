@@ -1,10 +1,22 @@
 #include "GrafoWeb.h"
 #include "QQueue"
 #include "QSet"
+
+/**
+ * @brief Constructor de la clase GrafoWeb.
+ * @details Inicializa los contadores de la estructura de red web, estableciendo el número
+ * de aristas o conexiones acumuladas en cero.
+ */
 GrafoWeb::GrafoWeb() {
     totalAristas = 0;
 }
 
+/**
+ * @brief Agrega un nuevo nodo (página web) a la lista de adyacencia.
+ * @details Normaliza la dirección URL removiendo la barra diagonal de cierre si existe.
+ * Si el nodo no se encuentra previamente registrado, inicializa su lista de enlaces salientes vacía.
+ * @param url Dirección URL que actuará como identificador único del nodo.
+ */
 void GrafoWeb::agregarNodo(const QString& url) {
     QString urlLimpia = url;
     if (urlLimpia.endsWith("/")) {
@@ -19,6 +31,13 @@ void GrafoWeb::agregarNodo(const QString& url) {
 
 }
 
+/**
+ * @brief Añade una arista dirigida que conecta un nodo origen con un nodo destino.
+ * @details Asegura la existencia de ambos nodos en el grafo, normaliza sus URLs para evitar
+ * duplicados estéticos y asocia el destino a la lista de adyacencia del origen si no estaba ya presente.
+ * @param urlOrigen URL de la página web de procedencia.
+ * @param urlDestino URL de la página web vinculada.
+ */
 void GrafoWeb::agregarArista(const QString& urlOrigen, const QString& urlDestino) {
     // Nos aseguramos de que el nodo de origen exista
     agregarNodo(urlOrigen);
@@ -41,6 +60,12 @@ void GrafoWeb::agregarArista(const QString& urlOrigen, const QString& urlDestino
     }
 }
 
+/**
+ * @brief Verifica si una URL específica se encuentra registrada en la estructura del grafo.
+ * @details Aplica una normalización previa a la cadena y realiza una consulta de existencia en el hash.
+ * @param url URL que se desea comprobar.
+ * @return true si el nodo existe en la lista de adyacencia, false en caso contrario.
+ */
 bool GrafoWeb::contieneNodo(const QString& url) const {
     QString urlLimpia = url;
     if (urlLimpia.endsWith("/")) {
@@ -50,6 +75,12 @@ bool GrafoWeb::contieneNodo(const QString& url) const {
     return listaAdyacencia.contains(urlLimpia);
 }
 
+/**
+ * @brief Recupera los enlaces de salida o páginas adyacentes a un nodo dado.
+ * @details Limpia la URL de barras finales y extrae la lista de strings asociada en el hash.
+ * @param url URL del nodo origen a consultar.
+ * @return QStringList Lista de URLs a las que el nodo origen apunta directamente.
+ */
 QStringList GrafoWeb::obtenerAdyacentes(const QString& url) const {
     QString urlLimpia = url;
     if (urlLimpia.endsWith("/")) {
@@ -62,27 +93,56 @@ QStringList GrafoWeb::obtenerAdyacentes(const QString& url) const {
     return QStringList();
 }
 
+/**
+ * @brief Obtiene el listado completo de todos los nodos (claves del hash) indexados en el grafo.
+ * @return QList<QString> Lista lineal con los identificadores únicos de todas las páginas web registradas.
+ */
 QList<QString> GrafoWeb::obtenerTodosLosNodos() const {
     return listaAdyacencia.keys();
 }
 
+/**
+ * @brief Restablece el grafo por completo eliminando todos sus nodos y aristas.
+ * @details Vacía la tabla hash y pone a cero el contador total de conexiones.
+ */
 void GrafoWeb::limpiar() {
     listaAdyacencia.clear();
     totalAristas = 0;
 }
 
+/**
+ * @brief Devuelve la cantidad actual de nodos únicos registrados en la red.
+ * @return int Tamaño o número de entradas en la lista de adyacencia.
+ */
 int GrafoWeb::cantidadNodos() const {
     return listaAdyacencia.size();
 }
 
+/**
+ * @brief Devuelve el conteo acumulado de aristas o enlaces hipertextuales válidos.
+ * @return int Número total de conexiones dirigidas detectadas.
+ */
 int GrafoWeb::cantidadAristas() const {
     return totalAristas;
 }
 
+/**
+ * @brief Permite el acceso de solo lectura a la estructura hash de adyacencia subyacente.
+ * @details Utilizado principalmente por componentes de persistencia externos (capa de datos).
+ * @return const QHash<QString, QStringList>& Referencia constante a la tabla hash interna.
+ */
 const QHash<QString, QStringList>& GrafoWeb::obtenerEstructuraCompleta() const {
     return listaAdyacencia;
 }
 
+/**
+ * @brief Ejecuta el algoritmo de exploración BFS para calcular distancias óptimas y predecesores desde la raíz.
+ * @details Limpia los contenedores de salida e inicia un recorrido en anchura desde la URL origen.
+ * Determina el número de clics mínimos para alcanzar cualquier otro nodo y guarda la relación de padres.
+ * @param urlOrigen URL raíz o punto de partida del recorrido.
+ * @param distancias Hash de salida que mapeará cada URL con su distancia en clics desde la raíz.
+ * @param padres Hash de salida que asociará cada URL con su nodo predecesor directo en el camino mínimo.
+ */
 void GrafoWeb::calcularRutasDesdeRaiz(const QString& urlOrigen,
                                       QHash<QString, int>& distancias,
                                       QHash<QString, QString>& padres) const {
@@ -112,6 +172,16 @@ void GrafoWeb::calcularRutasDesdeRaiz(const QString& urlOrigen,
         }
     }
 }
+
+/**
+ * @brief Traza y reconstruye la secuencia de nodos ordenados que forman la ruta óptima.
+ * @details Realiza un recorrido inverso desde el destino hacia el origen utilizando el mapa de precedencias.
+ * Si no se consigue un camino conectado válido hasta la raíz, devuelve una lista vacía.
+ * @param urlOrigen URL inicial o nodo raíz de la búsqueda.
+ * @param urlDestino URL de destino a la que se desea llegar.
+ * @param padres Hash de consulta que contiene la estructura de relaciones de procedencia.
+ * @return QStringList Lista ordenada secuencialmente desde el origen hasta el destino si la ruta es válida.
+ */
 QStringList GrafoWeb::reconstruirRuta(const QString& urlOrigen, const QString& urlDestino, const QHash<QString, QString>& padres) const {
     QStringList ruta;
     QString pasoActual = urlDestino;

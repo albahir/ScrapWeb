@@ -15,6 +15,12 @@
 
 #include <QDebug>
 
+/**
+ * @brief Constructor de la clase VentanaPrincipal.
+ * @details Inicializa los componentes principales del sistema (Grafo, Rastreador, Modelos e Índices),
+ * configura la interfaz gráfica y establece las conexiones de señales y slots para la comunicación asíncrona.
+ * @param parent Puntero al widget padre de Qt (por defecto nullptr).
+ */
 VentanaPrincipal::VentanaPrincipal(QWidget *parent) : QMainWindow(parent) {
     setWindowTitle("Analizador de Sitios Web v1.0");
     resize(1050, 600); // Tamaño inicial basado en tu imagen
@@ -55,9 +61,20 @@ VentanaPrincipal::VentanaPrincipal(QWidget *parent) : QMainWindow(parent) {
     });
 }
 
+/**
+ * @brief Destructor de la clase VentanaPrincipal.
+ * @details Libera la memoria utilizada por los componentes de la ventana. La destrucción de los widgets
+ * hijos es gestionada automáticamente por el sistema de paternidad de Qt.
+ */
 VentanaPrincipal::~VentanaPrincipal() {
     // Qt maneja la destrucción de los widgets hijos automáticamente
 }
+
+/**
+ * @brief Configura la distribución y los elementos de la interfaz gráfica de usuario.
+ * @details Organiza la ventana en tres paneles principales (izquierdo, central y derecho),
+ * enlaza las señales de los botones de acción e inicializa el estado visual inicial y estilos.
+ */
 void VentanaPrincipal::configurarInterfaz() {
     QWidget *widgetCentral = new QWidget(this);
     setCentralWidget(widgetCentral);
@@ -77,6 +94,12 @@ void VentanaPrincipal::configurarInterfaz() {
     cambiarEstadoUI(ESTADO_ESPERANDO);
 }
 
+/**
+ * @brief Crea el panel izquierdo de la interfaz que contiene los controles de mapeo.
+ * @details Configura las entradas de URL, profundidad, concurrencia de hilos, filtros de exclusión
+ * y elementos de estado como la barra de progreso.
+ * @return QVBoxLayout* Puntero al layout vertical que organiza el panel izquierdo.
+ */
 QVBoxLayout* VentanaPrincipal::crearPanelIzquierdo() {
     QVBoxLayout *layout = new QVBoxLayout();
 
@@ -130,17 +153,24 @@ QVBoxLayout* VentanaPrincipal::crearPanelIzquierdo() {
 
     return layout;
 }
+
+/**
+ * @brief Crea el panel central de la interfaz dedicado a mostrar los resultados.
+ * @details Configura el árbol de vista jerárquica para la estructura del sitio y la sección
+ * de búsqueda por palabras clave con su respectiva lista de resultados.
+ * @return QVBoxLayout* Puntero al layout vertical que organiza el panel central.
+ */
 QVBoxLayout* VentanaPrincipal::crearPanelCentral() {
     QVBoxLayout *layout = new QVBoxLayout();
 
     QGroupBox *grupoEstructura = new QGroupBox("Estructura del Sitio (Mismo Dominio)");
     QVBoxLayout *layoutEstructura = new QVBoxLayout(grupoEstructura);
     grupoEstructura->setFixedWidth(650);
-     grupoEstructura->setFixedHeight(400);
+    grupoEstructura->setFixedHeight(400);
     arbolEstructura = new QTreeView();
-     arbolEstructura->setUniformRowHeights(true);
+    arbolEstructura->setUniformRowHeights(true);
 
-     arbolEstructura->setAnimated(false);
+    arbolEstructura->setAnimated(false);
     arbolEstructura->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     arbolEstructura->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
     arbolEstructura->header()->setStretchLastSection(false);
@@ -181,6 +211,12 @@ QVBoxLayout* VentanaPrincipal::crearPanelCentral() {
     return layout;
 }
 
+/**
+ * @brief Crea el panel derecho de la interfaz enfocado en analíticas y persistencia.
+ * @details Aloja el formulario dinámico de métricas estructurales (como el cálculo de sumideros y densidades)
+ * y los controles para interactuar con la persistencia de datos (Capa de Datos).
+ * @return QVBoxLayout* Puntero al layout vertical que organiza el panel derecho.
+ */
 QVBoxLayout* VentanaPrincipal::crearPanelDerecho() {
     QVBoxLayout *layout = new QVBoxLayout();
 
@@ -256,7 +292,11 @@ QVBoxLayout* VentanaPrincipal::crearPanelDerecho() {
     return layout; // Retornamos el layout limpio a la ventana principal
 }
 
-// Implementación vacía de los slots (Aquí llamarán a su Capa de Negocio luego)
+/**
+ * @brief Slot que inicia el proceso asíncrono de rastreo y mapeo web.
+ * @details Realiza validaciones previas de la URL, normaliza el esquema de conexión,
+ * restablece los componentes de almacenamiento (árbol e índice invertido) e indica al motor que comience.
+ */
 void VentanaPrincipal::iniciarMapeo() {
     QString urlInicial = txtUrl->text().trimmed();
 
@@ -299,6 +339,11 @@ void VentanaPrincipal::iniciarMapeo() {
     rastreador->iniciarRastreo(urlInicial, spinProfundidad->value(), spinConcurrencia->value());
 }
 
+/**
+ * @brief Slot que cancela de forma segura el rastreo web en ejecución.
+ * @details Detiene de inmediato el motor web y fuerza el procesamiento y despliegue del grafo
+ * con las páginas recolectadas de manera parcial hasta el momento exacto del aborto.
+ */
 void VentanaPrincipal::detenerMapeo() {
     rastreador->detenerRastreo();
 
@@ -321,6 +366,11 @@ void VentanaPrincipal::detenerMapeo() {
     lblEstado->setText("Estado: Detenido. Datos parciales mostrados.");
 }
 
+/**
+ * @brief Slot que realiza búsquedas de texto e identifica las rutas de navegación mínimas en el grafo.
+ * @details Combina la consulta en el índice invertido (búsqueda de contenido) con el algoritmo BFS
+ * integrado en el grafo para rastrear el camino de clics mínimos desde el nodo raíz hasta los destinos coincidentes.
+ */
 void VentanaPrincipal::buscarPalabra() {
     listaResultadosBusqueda->clear();
     QString palabraObjetivo = txtBuscar->text().trimmed();
@@ -399,6 +449,13 @@ void VentanaPrincipal::buscarPalabra() {
     }
 
 }
+
+/**
+ * @brief Slot de respuesta gatillado al descubrir un enlace durante el crawling.
+ * @details Calcula dinámicamente las métricas de fuentes e introduce elipsis visuales (cortes con "...")
+ * en la barra de estado si la dirección URL excede el ancho seguro asignado en píxeles.
+ * @param url Dirección URL descubierta en la ejecución.
+ */
 void VentanaPrincipal::onEnlaceDescubierto(const QString& url) {
     // 1. Tomamos el tamaño actual que tiene el texto del estado
     QFontMetrics metricas(lblEstado->font());
@@ -413,16 +470,21 @@ void VentanaPrincipal::onEnlaceDescubierto(const QString& url) {
     QCoreApplication::processEvents();
 }
 
+/**
+ * @brief Slot ejecutado cuando el RastreadorWeb finaliza la tarea programada.
+ * @details Cambia el estado del controlador visual, delega la transformación del grafo al adaptador de vistas,
+ * expande los nodos principales y refresca las analíticas globales.
+ */
 void VentanaPrincipal::onRastreoFinalizado() {
     lblEstado->setText("Estado: Mapeo completado. Analizando métricas...");
-   cambiarEstadoUI(ESTADO_FINALIZADO);
+    cambiarEstadoUI(ESTADO_FINALIZADO);
     // DELEGACIÓN: El adaptador se encarga de convertir el Grafo al Árbol
     QString urlBase = txtUrl->text().trimmed();
     if(!urlBase.startsWith("http")) urlBase = "https://" + urlBase;
     arbolEstructura->setUpdatesEnabled(false);
     AdaptadorGrafoArbol::poblarModelo(grafo, modeloArbol, urlBase);
     arbolEstructura->setUpdatesEnabled(true);
-   arbolEstructura->expandToDepth(0);
+    arbolEstructura->expandToDepth(0);
 
     actualizarPanelMetricas();
 
@@ -430,6 +492,13 @@ void VentanaPrincipal::onRastreoFinalizado() {
 
 }
 
+/**
+ * @brief Slot invocado cuando una página ha finalizado su descarga de código fuente.
+ * @details Normaliza las barras diagonales de la dirección URL, inyecta los datos en el índice
+ * invertido de la aplicación y computa el conteo de bytes del documento para métricas de tamaño.
+ * @param url Dirección de procedencia del documento.
+ * @param html Código fuente web plano descargado.
+ */
 void VentanaPrincipal::onPaginaDescargada(const QString& url, const QString& html) {
     // 1. Normalizamos la URL (garantizamos que NO tenga slash final)
     QString urlLimpia = url;
@@ -446,11 +515,20 @@ void VentanaPrincipal::onPaginaDescargada(const QString& url, const QString& htm
     actualizarPanelMetricas();
 }
 
+/**
+ * @brief Slot encargado de recibir las marcas temporales en tiempo real emitidas por el temporizador.
+ * @param tiempoStr Cadena formateada del tiempo de ejecución acumulado (MM:SS).
+ */
 void VentanaPrincipal::onTiempoTranscurrido(const QString& tiempoStr) {
     ultimoTiempoRastreo = tiempoStr;
     actualizarPanelMetricas();
 }
 
+/**
+ * @brief Realiza los cálculos y actualiza el panel derecho con métricas de red.
+ * @details Valida que existan nodos disponibles para cómputos e interactúa con el AnalizadorMetricas
+ * para inyectar cadenas HTML complejas, densidades de aristas, nodos sumidero e información de referencias.
+ */
 void VentanaPrincipal::actualizarPanelMetricas() {
     // Evita calcular si el grafo está vacío
 
@@ -468,37 +546,41 @@ void VentanaPrincipal::actualizarPanelMetricas() {
 
     }else{
 
-    // Llamamos a la Capa de Negocio (AnalizadorMetricas)
-    MetricasSitio reporte = AnalizadorMetricas::generarReporte(grafo, ultimoTiempoRastreo, totalBytesContados);
-    // Volcamos a la UI
-    lblTiempoEjecucion->setText(QString(" %1").arg(reporte.tiempoEjecucion));
-    lblPaginasEncontradas->setText(QString::number(reporte.paginasEncontradas));
-    lblEnlacesDetectados->setText(QString::number(reporte.enlacesDetectados));
+        // Llamamos a la Capa de Negocio (AnalizadorMetricas)
+        MetricasSitio reporte = AnalizadorMetricas::generarReporte(grafo, ultimoTiempoRastreo, totalBytesContados);
+        // Volcamos a la UI
+        lblTiempoEjecucion->setText(QString(" %1").arg(reporte.tiempoEjecucion));
+        lblPaginasEncontradas->setText(QString::number(reporte.paginasEncontradas));
+        lblEnlacesDetectados->setText(QString::number(reporte.enlacesDetectados));
 
-    // Inyectamos los sumideros
-    lblPaginasSumidero->setText(QString::number(reporte.paginasSumidero));
+        // Inyectamos los sumideros
+        lblPaginasSumidero->setText(QString::number(reporte.paginasSumidero));
 
-    lblDensidadConexiones->setText(QString::number(reporte.densidadConexiones, 'f', 2));
-    lblTamanoDescargado->setText(reporte.tamanoTotal);
+        lblDensidadConexiones->setText(QString::number(reporte.densidadConexiones, 'f', 2));
+        lblTamanoDescargado->setText(reporte.tamanoTotal);
 
-    // Inyectamos HTML para la página con más Salidas (Métrica 1)
-    QString formatoSalidas = QString(
-                                 "<span style='color: #2d3748; font-weight: bold;'>Página con más salidas:</span><br>"
-                                 "<span style='color: #4a5568; font-size: 10px; font-weight: normal;'>%1</span>"
-                                 ).arg(reporte.paginaMasConectada);
-    lblPaginaMasConectada->setText(formatoSalidas);
+        // Inyectamos HTML para la página con más Salidas (Métrica 1)
+        QString formatoSalidas = QString(
+                                     "<span style='color: #2d3748; font-weight: bold;'>Página con más salidas:</span><br>"
+                                     "<span style='color: #4a5568; font-size: 10px; font-weight: normal;'>%1</span>"
+                                     ).arg(reporte.paginaMasConectada);
+        lblPaginaMasConectada->setText(formatoSalidas);
 
-    // Inyectamos HTML para la página más Referenciada (Métrica 2)
-    QString formatoEntradas = QString(
-                                  "<span style='color: #2d3748; font-weight: bold;'>Página más referenciada:</span><br>"
-                                  "<span style='color: #4a5568; font-size: 10px; font-weight: normal;'>%1 <b>(%2 enlaces)</b></span>"
-                                  ).arg(reporte.paginaMasReferenciada).arg(reporte.maxEnlacesRecibidos);
-    lblPaginaMasReferenciada->setText(formatoEntradas);
+        // Inyectamos HTML para la página más Referenciada (Métrica 2)
+        QString formatoEntradas = QString(
+                                      "<span style='color: #2d3748; font-weight: bold;'>Página más referenciada:</span><br>"
+                                      "<span style='color: #4a5568; font-size: 10px; font-weight: normal;'>%1 <b>(%2 enlaces)</b></span>"
+                                      ).arg(reporte.paginaMasReferenciada).arg(reporte.maxEnlacesRecibidos);
+        lblPaginaMasReferenciada->setText(formatoEntradas);
 
     }
 }
 
-
+/**
+ * @brief Gestiona la exportación de la sesión actual y el grafo a un archivo local de texto plano.
+ * @details Genera un nombre de archivo sugerido con marcas cronológicas detalladas y concatena
+ * metadatos analíticos estadísticos estructurados en las líneas iniciales de cabecera del reporte.
+ */
 void VentanaPrincipal::guardarHistorial() {
     if (grafo->cantidadNodos() == 0) {
         QMessageBox::warning(this, "Guardar Grafo", "El grafo está vacío. Mapea un sitio web primero.");
@@ -564,6 +646,12 @@ void VentanaPrincipal::guardarHistorial() {
         QMessageBox::critical(this, "Error", "No se pudo escribir en el archivo seleccionado.\nVerifique permisos o si el archivo está en uso.");
     }
 }
+
+/**
+ * @brief Gestiona la importación y reconstrucción de un grafo persistido previamente desde disco.
+ * @details Solicita confirmación si existen datos activos en la sesión, lee de forma secuencial la estructura
+ * a través de la capa lógica del GestorArchivos y repobla las vistas jerárquicas y los paneles estadísticos.
+ */
 void VentanaPrincipal::cargarHistorial() {
 
     if (grafo->cantidadNodos() > 0) {
@@ -635,9 +723,13 @@ void VentanaPrincipal::cargarHistorial() {
         QMessageBox::critical(this, "Error", "El archivo seleccionado no tiene un formato válido o está corrupto.");
     }
 }
-// =========================================================
-// MÁQUINA DE ESTADOS (Controlador centralizado de UI)
-// =========================================================
+
+/**
+ * @brief Controlador centralizado para la máquina de estados lógicos de la UI.
+ * @details Habilita o deshabilita los widgets de interacción (botones de inicio, parada, carga y almacenamiento)
+ * y ajusta dinámicamente el comportamiento e indicaciones numéricas de la barra de progreso según el contexto.
+ * @param estado Estado de la aplicación actual a establecer (EstadoAplicacion).
+ */
 void VentanaPrincipal::cambiarEstadoUI(EstadoAplicacion estado) {
     bool hayDatosGuardables = (grafo && grafo->cantidadNodos() > 0);
 
@@ -679,9 +771,11 @@ void VentanaPrincipal::cambiarEstadoUI(EstadoAplicacion estado) {
     }
 }
 
-// =========================================================
-// HOJA DE ESTILOS CENTRALIZADA (Limpia los paneles visuales)
-// =========================================================
+/**
+ * @brief Aplica las reglas y configuraciones estéticas de las hojas de estilo globales (QSS).
+ * @details Personaliza los colores de acento, bordes, rellenos internos (paddings) y estados de enfoque
+ * de los botones, selectores y editores de texto para unificar el apartado visual del sistema.
+ */
 void VentanaPrincipal::aplicarEstilosGlobales() {
     // Botones Izquierdos
     btnIniciar->setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;");
